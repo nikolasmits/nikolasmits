@@ -3,9 +3,9 @@
 <h2>🤖 Control Systems and Robotics:</h2>
 
 - <b>Automated Component Embedding Integration for an FDM 3D Printer</b>
-  - [Modifying a TAZ 5 3D Printer with an end-effector gripper, toolchange mechanism & machine vision](https://github.com/nikolasmits/nikolasmits/tree/main/sentiment-analysis)
+  - [Modifying a TAZ 5 3D Printer with an end-effector gripper, toolchange mechanism & machine vision](https://github.com/nikolasmits/nikolasmits/tree/main/automated-component-embedding-integration-for-an-fdm-3d-printer)
 - <b>Designing and Testing a a Maze Solving Robot</b>
-  - [Four-wheeled robot with sensing and actuation for obstacle-based movement](https://github.com/nikolasmits/nikolasmits/tree/main/sentiment-analysis)
+  - [Four-wheeled robot with sensing and actuation for obstacle-based movement](https://github.com/nikolasmits/nikolasmits/tree/main/maze-solving-robot)
 - <b>Braille-to-text-to-speech reading robot</b>
   - [UCL Neuphonic AI Hackathon](https://github.com/nikolasmits/nikolasmits/tree/main/sentiment-analysis)
 - <b>Pick-and-place (PnP) Robot</b>
