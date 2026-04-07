@@ -1,0 +1,2 @@
+#This file is generated automatically.  Do not attempt to edit it!
+ft=4002 ext=.dat fname=test_v_lamda.dat cols=[X,Y+] xnames=[] wnames=[] header=[skip] dimension=2 apodization=0 anisotropic=0 output_option=2 launch_type=0 primary_direction=5 nxmin=-15 nxmax=15 nymin=0 nymax=0 refx=['0'] refy=['0'] refz=['0'] trax=['0'] tray=['0'] traz=['0'] diff_refl=0 diff_trans=0 total_refl=1 total_trans=0 absorption=1 tanpsicosdelta=0 e_coef=0 e_coef_refl=0 e_coef_trans=0 e_coef_format=0 

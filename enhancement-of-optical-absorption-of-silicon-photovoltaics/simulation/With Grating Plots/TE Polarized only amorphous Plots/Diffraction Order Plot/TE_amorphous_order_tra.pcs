@@ -1,0 +1,10 @@
+/tt"Transmitted Diffraction Efficiency vs. Order"
+/xl"Order"
+/yl"Transmitted Power"
+/w,,0
+/st/ls0/i1
+
+TM_amorphous_order_tra_de.dat
+
+TM_amorphous_order_tra_de.dat /lc9/ls1/hist
+

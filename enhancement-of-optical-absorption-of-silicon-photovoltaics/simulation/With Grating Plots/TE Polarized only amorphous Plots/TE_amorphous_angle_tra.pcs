@@ -1,0 +1,11 @@
+/tt"Transmitted Diffraction Efficiency vs. Angle"
+/xl"Angle (degree)"
+/yl"Transmitted Power"
+/w-90,90,0
+/st/ls0/i0
+!@TM_amorphous_order_tra_inc.dat
+
+TM_amorphous_order_tra_de.dat
+
+TM_amorphous_order_tra_de.dat /lc9/ls1/hist
+

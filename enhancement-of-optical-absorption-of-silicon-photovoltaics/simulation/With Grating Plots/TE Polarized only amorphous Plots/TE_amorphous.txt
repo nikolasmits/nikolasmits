@@ -1,0 +1,4 @@
+
+Total reflection:   9.3169128895E-01
+
+Total absorption:   6.8113956237E-02

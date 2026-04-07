@@ -1,0 +1,11 @@
+/tt"Reflected Diffraction Efficiency vs. Angle"
+/xl"Angle (degree)"
+/yl"Reflected Power"
+/w-90,90,0
+/st/ls0/i0
+!@TM_amorphous_order_ref_inc.dat
+
+TM_amorphous_order_ref_de.dat
+
+TM_amorphous_order_ref_de.dat /lc9/ls1/hist
+

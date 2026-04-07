@@ -1,0 +1,10 @@
+/tt"Reflected Diffraction Efficiency vs. Order"
+/xl"Order"
+/yl"Reflected Power"
+/w,,0
+/st/ls0/i1
+
+TE_amorphous_order_ref_de.dat
+
+TE_amorphous_order_ref_de.dat /lc9/ls1/hist
+

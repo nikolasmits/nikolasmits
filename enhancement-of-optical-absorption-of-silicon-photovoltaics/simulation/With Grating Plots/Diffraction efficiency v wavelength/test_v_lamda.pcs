@@ -1,0 +1,6 @@
+/yl"Diffraction Efficiency (a.u.)"
+/xl"Wavelength (&mm)"
+/ls1/l/lh""
+
+test_v_lamda.dat/u1/lt"Total Reflection"
+test_v_lamda.dat/u2/lt"Absorption"
