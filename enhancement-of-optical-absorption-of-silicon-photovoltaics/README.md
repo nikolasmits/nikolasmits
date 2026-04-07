@@ -122,4 +122,3 @@ This project strengthened my understanding of how strongly optical absorption ca
 - `README.md` – project summary
 - `report/` – final report
 - `simulation/` – MATLAB live scripts for absorption maps, field analysis, and enhancement studies
-- `images/` – PV schematics, absorption maps, field plots, and parameter-sweep outputs
