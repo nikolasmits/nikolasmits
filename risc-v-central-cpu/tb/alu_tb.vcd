@@ -1,0 +1,111 @@
+$date
+	Sat Mar 08 18:09:35 2025
+$end
+$version
+	Icarus Verilog
+$end
+$timescale
+	1ps
+$end
+$scope module alu_tb $end
+$var wire 1 ! Zero $end
+$var wire 1 " Negative $end
+$var wire 32 # ALUResult [31:0] $end
+$var reg 5 $ ALUControl [4:0] $end
+$var reg 32 % SrcA [31:0] $end
+$var reg 32 & SrcB [31:0] $end
+$scope module dut $end
+$var wire 5 ' ALUControl [4:0] $end
+$var wire 32 ( SrcA [31:0] $end
+$var wire 32 ) SrcB [31:0] $end
+$var wire 1 ! Zero $end
+$var wire 32 * ShiftResult [31:0] $end
+$var wire 32 + SLTResult [31:0] $end
+$var wire 1 " Negative $end
+$var wire 32 , LogicResult [31:0] $end
+$var wire 32 - ArithResult [31:0] $end
+$var wire 2 . ALUOp [1:0] $end
+$var reg 32 / ALUResult [31:0] $end
+$upscope $end
+$upscope $end
+$enddefinitions $end
+#0
+$dumpvars
+b1010 /
+b10 .
+b1010 -
+b101 ,
+b0 +
+b10100000 *
+b101 )
+b101 (
+b10 '
+b101 &
+b101 %
+b10 $
+b1010 #
+0"
+0!
+$end
+#10000
+1!
+b0 #
+b0 /
+b0 -
+b1010 $
+b1010 '
+#20000
+b0 ,
+1!
+b0 #
+b0 /
+b11 .
+b11111111111111111111111111111111 -
+b1111000011110000000000000000000 *
+b1 +
+b11 $
+b11 '
+b1111000011110000111100001111 &
+b1111000011110000111100001111 )
+b11110000111100001111000011110000 %
+b11110000111100001111000011110000 (
+#30000
+0!
+b11111111111111111111111111111111 #
+b11111111111111111111111111111111 /
+b11111111111111111111111111111111 ,
+b111 $
+b111 '
+#40000
+b0 ,
+b10000 #
+b10000 /
+b0 .
+b0 +
+b110 -
+b10000 *
+b0 $
+b0 '
+b10 &
+b10 )
+b100 %
+b100 (
+#50000
+b1 #
+b1 /
+b1 *
+b10000 $
+b10000 '
+#60000
+1"
+b1010000000000 *
+b1 .
+b1 +
+b11111111111111111111111111111011 -
+b1001 $
+b1001 '
+b1010 &
+b1010 )
+b101 %
+b101 (
+#100000

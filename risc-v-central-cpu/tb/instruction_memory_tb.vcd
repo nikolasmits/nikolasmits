@@ -1,0 +1,61 @@
+$date
+	Mon Mar 03 17:36:44 2025
+$end
+$version
+	Icarus Verilog
+$end
+$timescale
+	1ps
+$end
+$scope module instruction_memory_tb $end
+$var wire 32 ! Instr [31:0] $end
+$var reg 32 " Addr [31:0] $end
+$scope module dut $end
+$var wire 32 # Instr [31:0] $end
+$var wire 32 $ PC [31:0] $end
+$var wire 32 % PC_divided_by_4 [31:0] $end
+$upscope $end
+$scope begin $ivl_for_loop0 $end
+$var integer 32 & i [31:0] $end
+$upscope $end
+$upscope $end
+$enddefinitions $end
+#0
+$dumpvars
+b0 &
+b0 %
+b0 $
+b11001000000000000010010011 #
+b0 "
+b11001000000000000010010011 !
+$end
+#5000
+b11111111110000000010000100000011 !
+b11111111110000000010000100000011 #
+b1 %
+b100 "
+b100 $
+b1 &
+#10000
+b1000000001000001000000110110011 !
+b1000000001000001000000110110011 #
+b10 %
+b1000 "
+b1000 $
+b10 &
+#15000
+b11111110001100000010111000100011 !
+b11111110001100000010111000100011 #
+b11 %
+b1100 "
+b1100 $
+b11 &
+#20000
+b1100011 !
+b1100011 #
+b100 %
+b10000 "
+b10000 $
+b100 &
+#25000
+b101 &
