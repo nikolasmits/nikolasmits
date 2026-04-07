@@ -204,7 +204,7 @@ This project strengthened my understanding of how a complete embedded wearable i
 ## Repository Contents
 - `README.md` – project summary
 - `report/` – final hardware design report
-- `pcb/` – KiCad project files
-- `schematics/` – key schematic screenshots
+- `pcb-design/` – KiCad project files
+- `schematics-design/` – key schematic screenshots
 - `images/` – PCB views, BOM, ERC/DRC, and component screenshots
 - `datasheets/` – supporting technical references
