@@ -1,0 +1,82 @@
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+
+
+def plot_metrics_superimposed(
+    title: str,
+    train_loss: dict,
+    test_loss: dict,
+    train_acc: dict,
+    test_acc: dict,
+    show_legend: bool = True,
+):
+    """Plot accuracy and loss metrics superimposed with separate y-axes."""
+    fig, ax_acc = plt.subplots(figsize=(8, 6))  # Back to original width
+    plt.rcParams.update({"font.size": 14})
+
+    ax_loss = ax_acc.twinx()
+    base_colors = list(mcolors.TABLEAU_COLORS.values())
+    lines, labels = [], []
+
+    for i, (name, accs) in enumerate(train_acc.items()):
+        base_color = base_colors[i % len(base_colors)]
+        acc_color = base_color
+        loss_color = mcolors.to_rgba(base_color, alpha=0.6)
+        epochs = range(1, len(accs) + 1)
+
+        (l1,) = ax_acc.plot(
+            epochs, accs, color=acc_color, linestyle="-", label=f"{name} Train Acc"
+        )
+        (l2,) = ax_acc.plot(
+            epochs,
+            test_acc[name],
+            color=acc_color,
+            linestyle="--",
+            label=f"{name} Test Acc",
+        )
+        (l3,) = ax_loss.plot(
+            epochs,
+            train_loss[name],
+            color=loss_color,
+            linestyle="-",
+            label=f"{name} Train Loss",
+        )
+        (l4,) = ax_loss.plot(
+            epochs,
+            test_loss[name],
+            color=loss_color,
+            linestyle="--",
+            label=f"{name} Test Loss",
+        )
+        lines.extend([l1, l2, l3, l4])
+        labels.extend(
+            [
+                f"{name} Train Acc",
+                f"{name} Test Acc",
+                f"{name} Train Loss",
+                f"{name} Test Loss",
+            ]
+        )
+
+    ax_acc.set_title(title, fontsize=16)
+    ax_acc.set_xlabel("Epoch", fontsize=14)
+    ax_acc.set_ylabel("Accuracy", fontsize=14, color="black")
+
+    # Adjusted loss label positioning
+    ax_loss.set_ylabel("Loss", fontsize=14, color="black", rotation=270, labelpad=15)
+
+    ax_acc.grid(True)
+    ax_acc.tick_params(axis="both", which="major", labelsize=12)
+    ax_loss.tick_params(axis="y", which="major", labelsize=12)
+
+    if show_legend:
+        # Fine-tuned spacing adjustments
+        fig.subplots_adjust(right=0.83)  # Adjusted right margin
+        ax_acc.legend(
+            lines, labels, loc="center left", bbox_to_anchor=(1.15, 0.5), fontsize=12
+        )
+
+    plt.tight_layout()
+    # Cancel out tight_layout's effect on the right margin
+    plt.subplots_adjust(right=0.83)
+    plt.show()

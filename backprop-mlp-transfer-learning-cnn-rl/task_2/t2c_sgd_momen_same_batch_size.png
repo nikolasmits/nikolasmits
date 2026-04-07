@@ -1,0 +1,53 @@
+from sklearn.preprocessing import StandardScaler
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+
+
+def pre_processing(seed: int):
+    """Discretizes class labels, split into train and test sets, scales features
+    on trian set values.
+
+    Arguments:
+        seed -- set random seed for reproducability
+
+    Returns:
+        training data -- list of tuples of features and labels for training
+        test data -- list of tuples of features and labels for testing
+
+    """
+    # Read in Iris file
+    df = pd.read_table("IrisData.txt", sep=",", header=None)
+
+    # Discretize the class labels, we have 3 classes
+    # We leave one hot encoding last
+    label_map = {"Iris-setosa": 0, "Iris-versicolor": 1, "Iris-virginica": 2}
+    df[4] = df[4].map(label_map)
+
+    train_data, test_data = train_test_split(
+        df, test_size=0.3, stratify=df[4], random_state=seed
+    )
+
+    # Scale features on train set
+    # Columns 0 - 3 are features, 4 is label
+    scaler = StandardScaler()
+    train_features = train_data[[0, 1, 2, 3]].values
+    test_features = test_data[[0, 1, 2, 3]].values
+
+    scaler.fit(train_features)  # fit on train data only
+
+    # Transform both training and test data
+    train_features_scaled = scaler.transform(train_features)
+    test_features_scaled = scaler.transform(test_features)
+
+    # Convert data into list, containing the features (np.ndarray) and label (int)
+    x_train = [np.array(row).reshape(-1, 1) for row in train_features_scaled]
+    y_train = [y for y in train_data[4].values]
+    x_test = [np.array(row).reshape(-1, 1) for row in test_features_scaled]
+    y_test = [y for y in test_data[4].values]
+
+    # Training and testing pairs
+    training_data = list(zip(x_train, y_train))
+    test_data = list(zip(x_test, y_test))
+
+    return training_data, test_data

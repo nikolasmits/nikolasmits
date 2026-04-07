@@ -1,0 +1,117 @@
+from nn import NeuralNet
+import numpy as np
+
+
+def adam(
+    nn: NeuralNet,
+    training_data: list,
+    testing_data: list,
+    epochs: int,
+    learning_rate: float,
+    batch_size: int,
+    beta1: float = 0.9,
+    beta2: float = 0.999,
+    epsilon: float = 1e-8,
+):
+    """Train network using Adam optimizer
+
+    Arguments:
+        nn -- neural network instance
+        training_data -- List of tuples (x, y) for input x and target y
+        testing_data -- List of tuples (x, y) for input x and target y
+        epochs -- Number of complete passes through training data
+        learning_rate -- Step size for gradient descent
+        batch_size -- Number of samples per gradient update
+        beta1 -- Exponential decay rate for first moment estimates
+        beta2 -- Exponential decay rate for second moment estimates
+        epsilon -- Small constant to prevent division by zero
+    """
+    n = len(training_data)
+    train_loss, test_loss = [], []
+    train_accuracy, test_accuracy = [], []
+
+    # Initialize Adam parameters
+    m_w = [np.zeros(w.shape) for w in nn.weights]  # First moment
+    m_b = [np.zeros(b.shape) for b in nn.biases]
+    v_w = [np.zeros(w.shape) for w in nn.weights]  # Second moment
+    v_b = [np.zeros(b.shape) for b in nn.biases]
+    t = 0  # Time step
+
+    for epoch in range(epochs):
+        ep_train_loss, ep_train_preds = 0.0, []
+        ep_test_loss, ep_test_preds = 0.0, []
+        ep_train_true, ep_test_true = [], []
+
+        # TRAIN
+        batches = [training_data[k : k + batch_size] for k in range(0, n, batch_size)]
+
+        for batch in batches:
+            t += 1  # Increment time step
+            nabla_w = [np.zeros(w.shape) for w in nn.weights]
+            nabla_b = [np.zeros(b.shape) for b in nn.biases]
+
+            for x, y in batch:
+                y_one_hot = np.zeros((3, 1))
+                y_one_hot[y] = 1
+
+                activations, zs = nn.forward(x)
+                loss = nn.cross_entropy_loss(y_pred=activations[-1], y_true=y_one_hot)
+                pred = np.argmax(activations[-1])
+
+                delta_nabla_w, delta_nabla_b = nn.backwards(
+                    activations=activations, zs=zs, y=y_one_hot
+                )
+
+                nabla_w = [nw + dnw for nw, dnw in zip(nabla_w, delta_nabla_w)]
+                nabla_b = [nb + dnb for nb, dnb in zip(nabla_b, delta_nabla_b)]
+
+                ep_train_loss += loss
+                ep_train_preds.append(pred)
+                ep_train_true.append(y)
+
+            # first moment estimate
+            m_w = [beta1 * m + (1 - beta1) * nw for m, nw in zip(m_w, nabla_w)]
+            m_b = [beta1 * m + (1 - beta1) * nb for m, nb in zip(m_b, nabla_b)]
+
+            # Second moment estimate
+            v_w = [beta2 * v + (1 - beta2) * (nw**2) for v, nw in zip(v_w, nabla_w)]
+            v_b = [beta2 * v + (1 - beta2) * (nb**2) for v, nb in zip(v_b, nabla_b)]
+
+            # Bias correction
+            m_w_corrected = [m / (1 - beta1**t) for m in m_w]
+            m_b_corrected = [m / (1 - beta1**t) for m in m_b]
+            v_w_corrected = [v / (1 - beta2**t) for v in v_w]
+            v_b_corrected = [v / (1 - beta2**t) for v in v_b]
+
+            # Update parameters
+            nn.weights = [
+                w - (learning_rate * m) / (np.sqrt(v) + epsilon)
+                for w, m, v in zip(nn.weights, m_w_corrected, v_w_corrected)
+            ]  # over each layer
+            nn.biases = [
+                b - (learning_rate * m) / (np.sqrt(v) + epsilon)
+                for b, m, v in zip(nn.biases, m_b_corrected, v_b_corrected)
+            ]  # over each layer
+
+        for x, y in testing_data:
+            y_one_hot = np.zeros((3, 1))
+            y_one_hot[y] = 1
+
+            activations, _ = nn.forward(x)
+            loss = nn.cross_entropy_loss(y_pred=activations[-1], y_true=y_one_hot)
+            pred = np.argmax(activations[-1])
+
+            ep_test_loss += loss
+            ep_test_preds.append(pred)
+            ep_test_true.append(y)
+
+        train_loss.append(ep_train_loss / len(training_data))
+        test_loss.append(ep_test_loss / len(testing_data))
+
+        train_acc = np.mean(np.array(ep_train_preds) == np.array(ep_train_true))
+        test_acc = np.mean(np.array(ep_test_preds) == np.array(ep_test_true))
+
+        train_accuracy.append(train_acc)
+        test_accuracy.append(test_acc)
+
+    return train_loss, test_loss, train_accuracy, test_accuracy
