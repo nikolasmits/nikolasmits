@@ -45,7 +45,7 @@
 - <b>Enhancement of Optical Absorption of Silicon Photovoltaics</b>
   - [Study of a hydrogenated amorphous silicion thin film PV cell with periodic gold nanowire gratings](https://github.com/nikolasmits/nikolasmits/tree/main/sentiment-analysis)
 - <b>Digital transmitter, AWGN Communication channel & Digital Receiver</b>
-  -[Design of a communication system](https://github.com/nikolasmits/nikolasmits/tree/main/sentiment-analysis)
+  - [Design of a communication system](https://github.com/nikolasmits/nikolasmits/tree/main/sentiment-analysis)
 - <b>Environmental Systems Mathematical Modelling</b>
   - [Simulating pollutant propagation across the Great Lakes](https://github.com/nikolasmits/nikolasmits/tree/main/sentiment-analysis)
 - <b>Mathematical model assessing the effects of altitude on the atmospheric pressure and density of air</b>
