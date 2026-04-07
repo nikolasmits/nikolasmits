@@ -18,7 +18,9 @@
 - <b>Python</b>
   - [Package Delivery Application (Datastructures and Algorithms Demo)](https://github.com/joshmadakor1/Package-Delivery-Pathfinding-Algorithm)
 
-<h2> Circuit Design and Hardware Development</h2>
+<h2> Circuit Design and Hardware Development:</h2>
+- <b> Smart Gym Wearable - Mixed Signal PCB Design (Advanced Embedded Dewsign for IoTSystems)</b>
+  - [Embedded Systems, Schematic & PCB Design](https://github.com/nikolasmits/nikolasmits/tree/main/sentiment-analysis)
 
 <h2> Digital Design and Computer Architecture</h2>
 
