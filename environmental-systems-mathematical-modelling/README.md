@@ -163,3 +163,4 @@ This project strengthened my understanding of how mathematical models can be use
 - `README.md` – project summary
 - `report/` – team final report and modelling write-up
 - `code/` – MATLAB model implementation
+- `data/` – MATLAB model implementated data
