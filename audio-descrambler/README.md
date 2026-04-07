@@ -143,6 +143,4 @@ This project significantly strengthened my understanding of how DSP concepts beh
 ## Repository Contents
 - `README.md` – project summary
 - `matlab/` – MATLAB scripts for analysis and prototyping
-- `fpga/` – Verilog / HDL modules
 - `presentation/` – project presentation
-- `hardware/` – DAC and analogue filter design notes
