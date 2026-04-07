@@ -1,4 +1,4 @@
-<h1>Hi, I'm Nikolaos! <br/><a href="https://www.linkedin.com/in/nikolas-mitsokapas-6b18a51ba/">Electronic and Electrical Engineer</a>, <a href="https://github.com/nikolasmits">Computer Science</a>
+<h1>Hi, I'm Nikolaos! <br/><a href="https://www.linkedin.com/in/nikolas-mitsokapas-6b18a51ba/">Electronic and Electrical Engineer</a>, <a href="https://www.linkedin.com/in/nikolas-mitsokapas-6b18a51ba/">Computer Science</a>
 
 <h2>🤖 Control Systems and Robotics:</h2>
 
