@@ -209,7 +209,6 @@ That combination reflects both theoretical understanding and practical implement
 ## Repository Contents
 - `README.md` – project summary
 - `report/` – final coursework report
-- `brief/` – assignment brief
 - `task_1/` – regression with 1-3-1 MLP
 - `task_2/` – classification with 4-5-3-3 MLP
 - `task_3/` – transfer learning with AlexNet and GoogLeNet
