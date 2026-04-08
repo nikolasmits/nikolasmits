@@ -1,0 +1,152 @@
+clear all
+close all
+clc
+
+% Load tumor data
+load X.mat
+load Y.mat
+load Z.mat
+
+%%%%%%%%%%%%%%%
+% Plot Tumor % 
+%%%%%%%%%%%%%%%
+
+[k2, av2] = convhull(X, Y, Z, 'Simplify', true);
+figure;
+hold on;
+% Tumor displayed as blue
+tumor_plot = trisurf(k2, X, Y, Z, 'FaceColor', 'blue', 'FaceAlpha', 0.5, 'EdgeColor', 'k');  
+
+%%%%%%%%%%%%%%%
+% Perform PCA to Find Principal Axes % 
+%%%%%%%%%%%%%%%
+
+% Combine X, Y, Z coordinates into one matrix (N x 3)
+tumor_points = [X, Y, Z];
+
+% Subtract the mean (centroid) of the tumor points
+centroid = mean(tumor_points);
+tumor_points_centered = tumor_points - centroid;
+
+% Compute the covariance matrix
+cov_matrix = cov(tumor_points_centered);
+
+% Perform PCA using the covariance matrix
+[eigenvectors, eigenvalues] = eig(cov_matrix);
+
+% The eigenvectors are the principal axes, and the eigenvalues are their magnitudes.
+% Sort eigenvalues and corresponding eigenvectors in descending order
+[eigenvalues_sorted, idx] = sort(diag(eigenvalues), 'descend');
+eigenvectors_sorted = eigenvectors(:, idx);
+
+% The longest axis is the first eigenvector
+major_axis = eigenvectors_sorted(:, 1);
+
+% The longest axis can be either the x, y, or z direction
+fprintf('Major Axis: [%f, %f, %f]\n', major_axis(1), major_axis(2), major_axis(3));
+
+%%%%%%%%%%%%%%%
+% Define Gray Box around the Tumor (Bone Area) % 
+%%%%%%%%%%%%%%%
+margin = 10; 
+minX = min(X) - margin;
+maxX = max(X) + margin;
+minY = min(Y) - margin;
+maxY = max(Y) + margin;
+minZ = min(Z) - margin;
+maxZ = 0;  
+
+boxVertices = [
+    minX, minY, minZ;
+    maxX, minY, minZ;
+    maxX, maxY, minZ;
+    minX, maxY, minZ;
+    minX, minY, maxZ;
+    maxX, minY, maxZ;
+    maxX, maxY, maxZ;
+    minX, maxY, maxZ
+];
+
+faces = [
+    1, 2, 3, 4;
+    5, 6, 7, 8;
+    1, 2, 6, 5;
+    2, 3, 7, 6;
+    3, 4, 8, 7;
+    4, 1, 5, 8
+];
+
+patch('Vertices', boxVertices, 'Faces', faces, 'FaceColor', [0.7, 0.7, 0.7], 'FaceAlpha', 0.3, 'EdgeColor', 'k');  
+
+
+%%%%%%%%%%%%%%%
+% Milling path 
+%%%%%%%%%%%%%%%
+
+num_layers = 10;                                                            % Number of milling layers
+layer_heights = linspace(0, min(Z), num_layers);                            % Milling layer heights along the bone
+safety_margin = 3;                                                          % Extra bone removal around tumor
+radius_offset = 3;                                                          % Offset for safe milling distance
+
+
+% Circle generation
+theta = linspace(0, 2*pi, 30);                                              
+
+for i = 1:num_layers
+    cut_z = layer_heights(i);
+    
+    % Find points on the tumor at current layer (cut_z) - consider only points near this height
+    idx = find(abs(Z - cut_z) < 0.5); 
+    if ~isempty(idx)
+        % Compute the maximum radius at this layer from the center (mean X and Y)
+        distances = sqrt((X(idx) - mean(X)).^2 + (Y(idx) - mean(Y)).^2);
+        % Find the max distance (radius)
+        max_radius = max(distances);  
+
+        % Add a small offset to the radius to avoid cutting into the tumor
+        cut_radius = max_radius + radius_offset;
+
+        % Calculate the circular milling path for this layer (aligned with the major axis)
+        % Rotate the milling circle around the centroid to align with the major axis
+
+        % Angle of the major axis in XY plane
+        angle_offset = atan2(major_axis(2), major_axis(1));                
+        cut_x = mean(X) + cut_radius * cos(theta + angle_offset);
+        cut_y = mean(Y) + cut_radius * sin(theta + angle_offset);
+        cut_z_plane = cut_z * ones(size(cut_x));
+
+        % Plot milling path in red
+        if cut_z < max(Z)
+            plot3(cut_x, cut_y, cut_z_plane, 'r-', 'LineWidth', 2);  
+        end
+    end
+end
+
+%%%%%%%%%%%%%%%
+% Final Deeper Pass (Undercut to free the tumor bottom) % 
+%%%%%%%%%%%%%%%
+
+% Add deeper depth for final pass
+final_cut_depth = min(Z) - 1.5;  
+
+% Create the horizontal milling plane at the new position
+[x_plane, y_plane] = meshgrid(linspace(mean(X) - cut_radius, mean(X) + cut_radius, 20), ...
+                              linspace(mean(Y) - cut_radius, mean(Y) + cut_radius, 20));
+z_plane = final_cut_depth * ones(size(x_plane)); 
+
+ % Final milling plane in red
+surf(x_plane, y_plane, z_plane, 'FaceColor', 'red', 'FaceAlpha', 0.5, 'EdgeColor', 'none'); 
+
+%%%%%%%%%%%%%%%
+% Display Settings % 
+%%%%%%%%%%%%%%%
+xlabel('X-axis');
+ylabel('Y-axis');
+zlabel('Z-axis');
+title('Safe Milling for Tumor Removal');
+axis equal;
+grid on;
+view(3);
+
+% Hold off
+hold off;
