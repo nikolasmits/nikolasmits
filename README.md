@@ -12,7 +12,7 @@
   - [Forward Kinematics, Inverse Kinematics & Trajectory planning of a PnP Robot](https://github.com/nikolasmits/nikolasmits/tree/main/pnp_robot)
 - <b>Connected Bioreactor Control System</b>
   - [Remote monitoring and control of a small-scale bioreactor](https://github.com/nikolasmits/nikolasmits/tree/main/bioreactor-control-system)
-- <b>Robotic Surgtical Tool</b>
+- <b>Robotic Surgical Tool Design</b>
   - [Conformal tool design, surgical planning](https://github.com/nikolasmits/nikolasmits/tree/main/bioreactor-control-system)
 
 <h2>👨‍💻 ML & DL Projects:</h2>
