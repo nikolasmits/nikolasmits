@@ -1,0 +1,230 @@
+#include <Wire.h>
+#include <Servo.h>
+#include "NutAngles.h"
+const int YAW_SERVO1_PIN = 9;
+const int YAW_SERVO2_PIN = 10;
+const int GRIPPER_SERVO_PIN = 11;
+double dt, last_time;
+double integral = 0.0;
+double previous = 0.0;
+double output = 0.0;
+double Kp = 0.3;
+double Ki = 0.4;
+double Kd = 0.001;
+Servo yawServo1;
+Servo yawServo2;
+Servo gripperServo;
+// ANGLE STATE
+double desiredAngle = 0.0;
+double targetAngle = 0.0;
+double currentAngle = 0.0;
+const double RAMP_STEP = 0.8;
+bool commandReceived = false;
+// AS5600 STATE
+9 APPENDIX
+82
+float degAngle = 0.0;
+float startAngle = 0.0;
+float correctedAngle = 0.0;
+// OK SIGNAL STATE
+float previousAngleForSettle = 0.0; // last angle reading for comparison
+bool okSent = false; // prevents sending OK multiple times
+const float SETTLE_THRESHOLD = 0.5; // degrees- if change less than this,
+settled
+const float REACH_TOLERANCE = 2.0; // degrees- must be within this of desired
+int angleToPWM_S1(double angle) {
+double pwm = (angle + 0.299414) / 0.013198 + 500.0;
+return (int)constrain(pwm, 500, 2500);
+}
+int angleToPWM_S2(double angle) {
+double pwm = (angle + 0.589778) / 0.013278 + 500.0;
+return (int)constrain(pwm, 500, 2500);
+}
+void writeYaw(double totalAngle) {
+totalAngle = constrain(totalAngle, 0, 180);
+double half = totalAngle / 2.0;
+yawServo1.writeMicroseconds(angleToPWM_S1(half));
+yawServo2.writeMicroseconds(angleToPWM_S2(half));
+}
+double pid(double error) {
+double proportional = error;
+integral += error * dt;
+integral = constrain(integral,-20, 20);
+double derivative = (error- previous) / dt;
+previous = error;
+return (Kp * proportional) + (Ki * integral) + (Kd * derivative);
+}
+// NUT LOOKUP
+bool getNutAngles(int nutNumber, float &openAngle, float &closeAngle) {
+switch (nutNumber) {
+case 1: openAngle = M2_OPEN; closeAngle = M2_CLOSE; return true;
+case 2: openAngle = M2_5_OPEN; closeAngle = M2_5_CLOSE; return true;
+case 3: openAngle = M3_OPEN; closeAngle = M3_CLOSE; return true;
+case 4: openAngle = M3_5_OPEN; closeAngle = M3_5_CLOSE; return true;
+case 5: openAngle = M4_OPEN; closeAngle = M4_CLOSE; return true;
+case 6: openAngle = M5_OPEN; closeAngle = M5_CLOSE; return true;
+default: return false;
+}
+}
+void parseCommand(String cmd) {
+cmd.trim();
+// YAW command
+if (cmd.startsWith("YAW ")) {
+double angle = cmd.substring(4).toFloat();
+angle = constrain(angle, 0, 180);
+if (!commandReceived) {
+yawServo1.attach(YAW_SERVO1_PIN, 500, 2500);
+yawServo2.attach(YAW_SERVO2_PIN, 500, 2500);
+9 APPENDIX
+83
+}
+desiredAngle = angle;
+integral = 0.0;
+commandReceived = true;
+okSent = false; // reset OK flag for new command
+previousAngleForSettle = currentAngle; // reset settle comparison
+Serial.print("YAW command: ");
+Serial.println(angle, 1);
+return;
+}
+// NUT command
+if (cmd.startsWith("NUT ")) {
+int firstSpace = cmd.indexOf(’ ’);
+int secondSpace = cmd.indexOf(’ ’, firstSpace + 1);
+if (firstSpace ==-1 || secondSpace ==-1) {
+Serial.println("ERR: format is NUT OPEN/CLOSE <1-6>");
+return;
+}
+String action = cmd.substring(firstSpace + 1, secondSpace);
+int nutNumber = cmd.substring(secondSpace + 1).toInt();
+action.trim();
+action.toUpperCase();
+float openAngle, closeAngle;
+if (!getNutAngles(nutNumber, openAngle, closeAngle)) {
+Serial.print("ERR: Unknown nut number: ");
+Serial.println(nutNumber);
+return;
+}
+if (action == "OPEN") {
+gripperServo.write(openAngle);
+Serial.print("Gripper OPEN for nut ");
+Serial.println(nutNumber);
+Serial.println("OK"); // gripper is direct- no feedback needed
+} else if (action == "CLOSE") {
+gripperServo.write(closeAngle);
+Serial.print("Gripper CLOSE for nut ");
+Serial.println(nutNumber);
+Serial.println("OK"); // gripper is direct- no feedback needed
+} else {
+Serial.println("ERR: action must be OPEN or CLOSE");
+}
+return;
+}
+Serial.print("ERR: Unknown command: ");
+Serial.println(cmd);
+}
+// SETTLE CHECK
+void checkSettleAndSendOK() {
+if (okSent) return;
+if (!commandReceived) return;
+9 APPENDIX
+84
+// Condition 1- must have reached the target range
+bool withinRange = abs(currentAngle- desiredAngle) <= REACH_TOLERANCE;
+// Condition 2- must have stopped moving
+bool settled = abs(currentAngle- previousAngleForSettle) < SETTLE_THRESHOLD
+;
+if (withinRange && settled) {
+Serial.println("OK");
+okSent = true;
+}
+// Update previous angle for next comparison
+previousAngleForSettle = currentAngle;
+}
+void setup() {
+Serial.begin(115200);
+Wire.begin();
+Wire.setClock(400000L);
+gripperServo.attach(GRIPPER_SERVO_PIN, 500, 2500);
+gripperServo.write(M2_CLOSE);
+checkMagnetPresence();
+ReadRawAngle();
+startAngle = degAngle;
+last_time = millis();
+Serial.println("Ready.");
+Serial.println("Commands: YAW <angle> | NUT OPEN <1-5> | NUT CLOSE <1-5>");
+Serial.println("Nuts: 1=M2 2=M2.5 3=M3 4=M3.5 5=M4 6=M5");
+}
+void loop() {
+// Read UART command
+if (Serial.available()) {
+String cmd = Serial.readStringUntil(’\n’);
+parseCommand(cmd);
+}
+// PID dt
+double now = millis();
+dt = (now- last_time) / 1000.0;
+last_time = now;
+if (dt <= 0) return;
+// Ramp targetAngle toward desiredAngle
+if (targetAngle < desiredAngle)
+targetAngle = min(targetAngle + RAMP_STEP, desiredAngle);
+else if (targetAngle > desiredAngle)
+targetAngle = max(targetAngle- RAMP_STEP, desiredAngle);
+// Read encoder
+ReadRawAngle();
+correctAngle();
+currentAngle = correctedAngle;
+9 APPENDIX
+85
+// PID
+double error = targetAngle- currentAngle;
+output = pid(error);
+double commandAngle = constrain(targetAngle + output, 0, 180);
+// Write yaw
+only after first command received
+if (commandReceived) writeYaw(commandAngle);
+// Check if yaw has settled and send OK to printer if so
+checkSettleAndSendOK();
+delay(20);
+}
+void ReadRawAngle() {
+Wire.beginTransmission(0x36);
+Wire.write(0x0D);
+Wire.endTransmission();
+Wire.requestFrom(0x36, 1);
+while (Wire.available() == 0);
+int lowbyte = Wire.read();
+Wire.beginTransmission(0x36);
+Wire.write(0x0C);
+Wire.endTransmission();
+Wire.requestFrom(0x36, 1);
+while (Wire.available() == 0);
+word highbyte = Wire.read();
+highbyte = highbyte << 8;
+int rawAngle = highbyte | lowbyte;
+degAngle = rawAngle * 0.087890625;
+}
+void correctAngle() {
+correctedAngle = degAngle- startAngle;
+if (correctedAngle < 0) correctedAngle += 360;
+if (correctedAngle > 360) correctedAngle-= 360;
+if (correctedAngle > 270.0) correctedAngle = correctedAngle- 360.0;
+}
+void checkMagnetPresence() {
+int magnetStatus = 0;
+while ((magnetStatus & 32) != 32) {
+magnetStatus = 0;
+Wire.beginTransmission(0x36);
+Wire.write(0x0B);
+Wire.endTransmission();
+Wire.requestFrom(0x36, 1);
+while (Wire.available() == 0);
+magnetStatus = Wire.read();
+if (!(magnetStatus & 32)) {
+Serial.println("Waiting for magnet...");
+delay(500);
+}
+}
+Serial.println("Magnet found.");
+delay(500);
