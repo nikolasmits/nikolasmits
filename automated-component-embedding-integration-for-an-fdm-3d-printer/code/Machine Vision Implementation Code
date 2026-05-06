@@ -1,0 +1,226 @@
+import os
+import numpy as np
+import tensorflow as tf
+from tensorflow import keras
+from PIL import Image
+import matplotlib.pyplot as plt
+DATA_ROOT = "/Users/rahuljo-shua/Desktop/Input"
+TEST_DIR = "/Users/rahuljo-shua/Desktop/Test"
+IMG_SIZE = (224, 224)
+BATCH_SIZE = 16
+EPOCHS = 40
+MODEL_PATH = "/Users/rahuljo-shua/Desktop/placement_classifier_mobilenet_copy.
+keras"
+SEED = 123
+THRESHOLD = 0.75
+def load_dataset_splits():
+fail_files = []
+success_files = []
+for nut_size in os.listdir(DATA_ROOT):
+nut_path = os.path.join(DATA_ROOT, nut_size)
+if not os.path.isdir(nut_path):
+continue
+fail_dir = os.path.join(nut_path, "Fail")
+success_dir = os.path.join(nut_path, "Success")
+if os.path.exists(fail_dir):
+fail_files += [
+os.path.join(fail_dir, f)
+for f in os.listdir(fail_dir)
+if f.lower().endswith((".jpg", ".jpeg", ".png"))
+]
+if os.path.exists(success_dir):
+success_files += [
+os.path.join(success_dir, f)
+for f in os.listdir(success_dir)
+if f.lower().endswith((".jpg", ".jpeg", ".png"))
+]
+print(f"[INFO] Total FAIL images: {len(fail_files)}")
+print(f"[INFO] Total SUCCESS images: {len(success_files)}")
+all_files = np.array(fail_files + success_files)
+all_labels = np.array([0]*len(fail_files) + [1]*len(success_files))
+rng = np.random.default_rng(SEED)
+idx = rng.permutation(len(all_files))
+9 APPENDIX
+67
+all_files = all_files[idx]
+all_labels = all_labels[idx]
+split_index = int(0.8 * len(all_files))
+train_files = all_files[:split_index]
+train_labels = all_labels[:split_index]
+val_files = all_files[split_index:]
+val_labels = all_labels[split_index:]
+print(f"[INFO] Training images: {len(train_files)}")
+print(f"[INFO] Validation images: {len(val_files)}")
+return train_files, train_labels, val_files, val_labels
+def load_image(path, label):
+def _load(path):
+path = path.numpy().decode("utf-8")
+try:
+img = Image.open(path).convert("RGB")
+img = img.resize(IMG_SIZE)
+img = np.array(img).astype(np.float32)
+except:
+return np.zeros((IMG_SIZE[0], IMG_SIZE[1], 3), dtype=np.float32)
+return img
+img = tf.py_function(_load, [path], tf.float32)
+img.set_shape([IMG_SIZE[0], IMG_SIZE[1], 3])
+img = tf.keras.applications.mobilenet_v2.preprocess_input(img)
+return img, label
+def build_datasets():
+train_files, train_labels, val_files, val_labels = load_dataset_splits()
+train_ds = tf.data.Dataset.from_tensor_slices((train_files, train_labels))
+train_ds = train_ds.shuffle(len(train_files))
+train_ds = train_ds.map(load_image, num_parallel_calls=tf.data.AUTOTUNE)
+train_ds = train_ds.batch(BATCH_SIZE)
+train_ds = train_ds.prefetch(tf.data.AUTOTUNE)
+val_ds = tf.data.Dataset.from_tensor_slices((val_files, val_labels))
+val_ds = val_ds.map(load_image, num_parallel_calls=tf.data.AUTOTUNE)
+val_ds = val_ds.batch(1)
+val_ds = val_ds.prefetch(tf.data.AUTOTUNE)
+return train_ds, val_ds, val_files, val_labels
+def build_model():
+data_augmentation = keras.Sequential([
+keras.layers.RandomFlip("horizontal"),
+9 APPENDIX
+68
+keras.layers.RandomRotation(0.15),
+keras.layers.RandomZoom(0.15),
+keras.layers.RandomBrightness(0.2),
+keras.layers.RandomContrast(0.2),
+])
+base = keras.applications.MobileNetV2(
+input_shape=(IMG_SIZE[0], IMG_SIZE[1], 3),
+include_top=False,
+weights="imagenet"
+)
+base.trainable = True
+for layer in base.layers[:-20]:
+layer.trainable = False
+model = keras.Sequential([
+data_augmentation,
+base,
+keras.layers.GlobalAveragePooling2D(),
+keras.layers.Dense(64, activation=’relu’),
+keras.layers.Dropout(0.4),
+keras.layers.Dense(1, activation=’sigmoid’)
+])
+model.compile(
+optimizer=keras.optimizers.Adam(3e-5),
+loss="binary_crossentropy",
+metrics=["accuracy"]
+)
+model.summary()
+return model
+def evaluate_validation_set(model, val_files, val_labels):
+print("\n================ VALIDATION RESULTS ================\n")
+correct = 0
+total = 0
+print(f"{’Filename’:<25} {’Pred’:<10} {’True’:<10} {’Prob’:<10} {’Result’}
+")
+print("-" * 70)
+for path, true_label in zip(val_files, val_labels):
+fname = os.path.basename(path)
+true_text = "SUCCESS" if true_label == 1 else "FAIL"
+try:
+img = Image.open(path).convert("RGB")
+img = img.resize(IMG_SIZE)
+img = np.array(img).astype("float32")
+except:
+continue
+img = tf.keras.applications.mobilenet_v2.preprocess_input(img)
+batch = np.expand_dims(img, axis=0)
+9 APPENDIX
+69
+prob = float(model.predict(batch, verbose=0)[0][0])
+pred_label = 1 if prob >= THRESHOLD else 0
+pred_text = "SUCCESS" if pred_label == 1 else "FAIL"
+is_correct = (pred_label == true_label)
+if is_correct:
+correct += 1
+total += 1
+print(f"{fname:<25} {pred_text:<10} {true_text:<10} {prob:<10.4f} {’
+’ if is_correct else ’ ’}")
+if total > 0:
+accuracy = (correct / total) * 100
+print("-" * 70)
+print(f"Accuracy: {accuracy:.2f}%
+({correct}/{total})")
+print("====================================================\n")
+def inference_on_folder(model, folder_path):
+print(f"\n========== INFERENCE ==========\n")
+for fname in os.listdir(folder_path):
+if not fname.lower().endswith((".jpg", ".jpeg", ".png")):
+continue
+path = os.path.join(folder_path, fname)
+try:
+img = Image.open(path).convert("RGB")
+img = img.resize(IMG_SIZE)
+img = np.array(img).astype("float32")
+except:
+print(f"{fname}
+continue
+SKIPPED")
+img = tf.keras.applications.mobilenet_v2.preprocess_input(img)
+batch = np.expand_dims(img, axis=0)
+prob = float(model.predict(batch, verbose=0)[0][0])
+pred = "SUCCESS" if prob >= THRESHOLD else "FAIL"
+print(f"{fname}
+if __name__ == "__main__":
+{pred} (prob={prob:.4f})")
+print("\n====== Placement Classifier (MobileNetV2 Transfer Learning)
+======")
+print("1 = Train model and save it")
+print("2 = Load saved model and run inference on TEST folder")
+print("==================================================================\
+n")
+choice = input("Select option (1/2): ").strip()
+if choice == "1":
+9 APPENDIX
+70
+train_ds, val_ds, val_files, val_labels = build_datasets()
+model = build_model()
+early_stop = keras.callbacks.EarlyStopping(
+monitor="val_loss",
+patience=5,
+restore_best_weights=True
+)
+print("\n[INFO] Training model...\n")
+history = model.fit(
+train_ds,
+validation_data=val_ds,
+epochs=EPOCHS,
+callbacks=[early_stop],
+class_weight={0: 1.5, 1: 1.0}
+)
+plt.figure()
+plt.plot(history.history[’accuracy’])
+plt.plot(history.history[’val_accuracy’])
+plt.title(’Training vs Validation Accuracy’)
+plt.xlabel(’Epoch’)
+plt.ylabel(’Accuracy’)
+plt.legend([’Train’, ’Validation’])
+plt.grid()
+plt.savefig("/Users/rahuljo-shua/Desktop/accuracy_plot.png")
+plt.show()
+plt.figure()
+plt.plot(history.history[’loss’])
+plt.plot(history.history[’val_loss’])
+plt.title(’Training vs Validation Loss’)
+plt.xlabel(’Epoch’)
+plt.ylabel(’Loss’)
+plt.legend([’Train’, ’Validation’])
+plt.grid()
+plt.savefig("/Users/rahuljo-shua/Desktop/loss_plot.png")
+plt.show()
+print("\n[INFO] Validation results:")
+evaluate_validation_set(model, val_files, val_labels)
+model.save(MODEL_PATH)
+print(f"\n[SUCCESS] Model saved to {MODEL_PATH}\n")
+elif choice == "2":
+if not os.path.exists(MODEL_PATH):
+print("[ERROR] Train a model first (option 1).")
+exit()
+model = keras.models.load_model(MODEL_PATH)
+inference_on_folder(model, TEST_DIR)
+else:
+print("[ERROR] Invalid option.")
