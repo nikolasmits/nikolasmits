@@ -202,7 +202,5 @@ This project demonstrates skills in:
 ## Repository Contents
 - `README.md` – project summary
 - `report/` – final report
-- `cad/` – end-effector, toolchanger, and tray CAD files
-- `code/` – Python, Arduino, and firmware-related implementation
-- `vision/` – machine vision scripts and model assets
-- `images/` – subsystem photos, CAD renders, and validation figures
+- `code/` – Python, Arduino, firmware-related implementation, and machine vision scripts
+- `images/` – subsystem photos, CAD renders and files, and validation figures
