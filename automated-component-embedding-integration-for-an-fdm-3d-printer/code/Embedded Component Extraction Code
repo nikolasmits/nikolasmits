@@ -1,0 +1,263 @@
+import zipfile
+import xml.etree.ElementTree as ET
+import io
+import json
+import numpy as np
+import time
+from pathlib import Path
+#Change to the user-input CAD file path
+input_file = r"C:/Users/nevai/OneDrive/Desktop/UCL/Year 4/Project 2/Export.3mf
+"
+#Change to the required print CAD output file path
+output_file = r"C:/Users/nevai/OneDrive/Desktop/UCL/Year 4/Project 2/Print.3mf
+"
+#Change to the required embedded components information file path
+embed_data_file = r"C:/Users/nevai/OneDrive/Desktop/UCL/Year 4/Project 2/
+embedded_components.json"
+#Change to the component library path
+LIBRARY_FOLDER = Path(r"C:/Users/nevai/OneDrive/Desktop/UCL/Year 4/Project 2/
+component_library")
+TARGET_CENTER_X = 150.0
+TARGET_CENTER_Y = 150.0
+TARGET_MIN_Z = 0.0
+#Timer for system efficiency check
+start_time = time.perf_counter()
+NS = "http://schemas.microsoft.com/3dmanufacturing/core/2015/02"
+ns = {"m": NS}
+ET.register_namespace("", NS)
+def rotation_matrix_to_euler_zyx(R):
+"""Convert rotation matrix to Euler angles."""
+sy = np.sqrt(R[0, 0] ** 2 + R[1, 0] ** 2)
+singular = sy < 1e-9
+if not singular:
+yaw = np.arctan2(R[1, 0], R[0, 0])
+pitch = np.arctan2(-R[2, 0], sy)
+roll = np.arctan2(R[2, 1], R[2, 2])
+else:
+yaw = np.arctan2(-R[0, 1], R[1, 1])
+pitch = np.arctan2(-R[2, 0], sy)
+roll = 0.0
+return float(np.degrees(yaw)), float(np.degrees(pitch)), float(np.degrees(
+roll))
+def kabsch_rotation(A, B):
+"""Compute rotation matrix aligning mesh B to mesh A."""
+if A.shape != B.shape:
+raise ValueError("Vertex count mismatch between canonical and
+extracted mesh.")
+cA = A.mean(axis=0)
+cB = B.mean(axis=0)
+AA = A- cA
+BB = B- cB
+9 APPENDIX
+72
+H = BB.T @ AA
+U, _, Vt = np.linalg.svd(H)
+R = Vt.T @ U.T
+if np.linalg.det(R) < 0:
+Vt[2, :] *=-1
+R = Vt.T @ U.T
+return R
+def load_vertices_from_3mf(filepath):
+"""Load vertex coordinates from a 3MF file."""
+if not filepath.exists():
+raise FileNotFoundError(f"Library component not found: {filepath}")
+with zipfile.ZipFile(filepath, ’r’) as z:
+model_xml = z.read("3D/3dmodel.model")
+tree = ET.ElementTree(ET.fromstring(model_xml))
+root = tree.getroot()
+verts = []
+for v in root.findall(".//m:vertex", ns):
+verts.append([
+float(v.get("x", 0)),
+float(v.get("y", 0)),
+float(v.get("z", 0))
+])
+if len(verts) < 3:
+raise ValueError(f"No vertices found in {filepath}")
+return np.array(verts)
+def compute_bbox(pts):
+"""Compute bounding box, centre, and size of a mesh."""
+min_vals = pts.min(axis=0)
+max_vals = pts.max(axis=0)
+centre = (min_vals + max_vals) / 2.0
+size = max_vals- min_vals
+return centre, min_vals, max_vals, size
+def apply_translation_to_xml_vertices(root, dx, dy, dz):
+"""Apply translation to all vertices in XML."""
+if dx == 0 and dy == 0 and dz == 0:
+return
+for v in root.findall(".//m:vertex", ns):
+x = float(v.get("x", 0))
+y = float(v.get("y", 0))
+z = float(v.get("z", 0))
+v.set("x", f"{x + dx:.6f}")
+v.set("y", f"{y + dy:.6f}")
+v.set("z", f"{z + dz:.6f}")
+def compute_translation_for_print_model(root, embed_ids):
+9 APPENDIX
+73
+"""Compute translation to centre and align print model."""
+objects = {obj.get("id"): obj for obj in root.findall(".//m:object", ns)}
+build_elem = root.find(".//m:build", ns)
+min_x = min_y = min_z = float("inf")
+max_x = max_y = max_z = float("-inf")
+for item in build_elem.findall("m:item", ns):
+oid = item.get("objectid")
+if oid in embed_ids:
+continue
+obj = objects.get(oid)
+if obj is None:
+continue
+name = obj.get("name", "") or ""
+if name != "Print_Model":
+continue
+for v in obj.findall(".//m:vertex", ns):
+x = float(v.get("x", 0))
+y = float(v.get("y", 0))
+z = float(v.get("z", 0))
+min_x = min(min_x, x)
+max_x = max(max_x, x)
+min_y = min(min_y, y)
+max_y = max(max_y, y)
+min_z = min(min_z, z)
+max_z = max(max_z, z)
+cx = (min_x + max_x) / 2.0
+cy = (min_y + max_y) / 2.0
+dx = TARGET_CENTER_X- cx
+dy = TARGET_CENTER_Y- cy
+dz = TARGET_MIN_Z- min_z
+return dx, dy, dz, {
+"min_x": min_x,
+"max_x": max_x,
+"min_y": min_y,
+"max_y": max_y,
+"min_z": min_z,
+"max_z": max_z
+}
+with zipfile.ZipFile(input_file, "r") as zin:
+file_data = {name: zin.read(name) for name in zin.namelist()}
+model_path = "3D/3dmodel.model"
+tree = ET.ElementTree(ET.fromstring(file_data[model_path]))
+root = tree.getroot()
+objects = {obj.get("id"): obj for obj in root.findall(".//m:object", ns)}
+build_elem = root.find(".//m:build", ns)
+embedded_components_info = []
+embed_ids = []
+9 APPENDIX
+74
+#Isolate and save embedded components
+for item in build_elem.findall("m:item", ns):
+oid = item.get("objectid")
+obj = objects.get(oid)
+if obj is None:
+continue
+name = obj.get("name", "") or ""
+if not name.startswith("Embed-"):
+continue
+clean_name = name.replace("Embed-", "", 1)
+embed_ids.append(oid)
+print(f’Component "{clean_name}" detected’)
+verts = []
+for v in obj.findall(".//m:vertex", ns):
+verts.append([
+float(v.get("x", 0)),
+float(v.get("y", 0)),
+float(v.get("z", 0))
+])
+extracted_pts = np.array(verts)
+centre, min_vals, max_vals, size = compute_bbox(extracted_pts)
+library_file = LIBRARY_FOLDER / f"{clean_name}.3mf"
+canonical_pts = load_vertices_from_3mf(library_file)
+R = kabsch_rotation(canonical_pts, extracted_pts)
+yaw, pitch, roll = rotation_matrix_to_euler_zyx(R)
+yaw = round(yaw / 2.0) * 2.0
+pitch = round(pitch / 2.0) * 2.0
+roll = round(roll / 2.0) * 2.0
+embedded_components_info.append({
+"id": oid,
+"name": clean_name,
+"centre": {
+"x": float(centre[0]),
+"y": float(centre[1]),
+"z": float(centre[2])
+},
+"bbox": {
+"min": {"x": float(min_vals[0]), "y": float(min_vals[1]), "z":
+float(min_vals[2])},
+"max": {"x": float(max_vals[0]), "y": float(max_vals[1]), "z":
+float(max_vals[2])},
+"size": {"x": float(size[0]), "y": float(size[1]), "z": float(size
+[2])}
+},
+"min_z": float(min_vals[2]),
+"max_z": float(max_vals[2]),
+"rotation_matrix": R.tolist(),
+"orientation": {
+"yaw_deg": yaw,
+9 APPENDIX
+75
+"pitch_deg": pitch,
+"roll_deg": roll
+}
+})
+print(f’Component "{clean_name}" extracted’)
+#Remove embedded components
+resources = root.find(".//m:resources", ns)
+if resources is not None:
+for obj in list(resources.findall("m:object", ns)):
+if obj.get("id") in embed_ids:
+resources.remove(obj)
+for item in list(build_elem.findall("m:item", ns)):
+if item.get("objectid") in embed_ids:
+build_elem.remove(item)
+# Centre print model
+dx, dy, dz, print_bounds = compute_translation_for_print_model(root, set(
+embed_ids))
+apply_translation_to_xml_vertices(root, dx, dy, dz)
+for comp in embedded_components_info:
+comp["centre"]["x"] += dx
+comp["centre"]["y"] += dy
+comp["centre"]["z"] += dz
+comp["min_z"] += dz
+comp["max_z"] += dz
+end_time = time.perf_counter()
+execution_time = end_time- start_time
+# Store updated files
+model_bytes = io.BytesIO()
+tree.write(model_bytes, encoding="utf-8", xml_declaration=True)
+file_data[model_path] = model_bytes.getvalue()
+with zipfile.ZipFile(output_file, "w", compression=zipfile.ZIP_DEFLATED) as
+zout:
+for name, data in file_data.items():
+zout.writestr(name, data)
+output_data = {
+"print_model": {
+"name": "Print_Model",
+"bbox": {
+"min": {
+"x": float(print_bounds["min_x"] + dx),
+"y": float(print_bounds["min_y"] + dy),
+"z": float(print_bounds["min_z"] + dz)
+},
+"max": {
+"x": float(print_bounds["max_x"] + dx),
+"y": float(print_bounds["max_y"] + dy),
+"z": float(print_bounds["max_z"] + dz)
+}
+},
+9 APPENDIX
+76
+"max_x": float(print_bounds["max_x"] + dx),
+"max_y": float(print_bounds["max_y"] + dy)
+},
+"embedded_components": embedded_components_info,
+"performance": {
+"execution_time_s": float(execution_time),
+"number_of_embedded_components": int(len(embedded_components_info))
+}
+}
+with open(embed_data_file, "w") as f:
+json.dump(output_data, f, indent=4)
+print("Complete!")
+print(f"Extracted {len(embedded_components_info)} components.")
+print(f"Execution time: {execution_time:.6f} s")
