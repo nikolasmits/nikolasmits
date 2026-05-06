@@ -1,0 +1,278 @@
+from math import floor
+from pathlib import Path
+import json
+import serial
+import time
+#Change to embedded component detail file path
+EMBED_JSON = Path(r"C:\Users\nevai\OneDrive\Desktop\UCL\Year 4\Project 2\
+embedded_components.json")
+#Change to g-code file path output from slicer
+INPUT_GCODE = Path(r"C:\Users\nevai\OneDrive\Desktop\UCL\Year 4\Project 2\
+Print_T5-SINGLE.gcode")
+SERIAL_PORT = "COM7"
+BAUDRATE = 250000
+SERIAL_PORT_G = "COM3"
+BAUDRATE_G = 115200
+TIMEOUT = 10
+#Set to true for manual embedding
+MANUAL_EMBED = False
+def load_components_geometry(json_path: Path):
+"""Load embedded component geometry and print model data from JSON."""
+if not json_path.exists():
+print("No embedding file found
+return None, None
+with open(json_path, "r") as f:
+data = json.load(f)
+running in print-only mode.")
+print_model = data.get("print_model", {})
+components = data.get("embedded_components", [])
+if not components:
+print("Embedding file contains no embedded components
+print-only mode.")
+results = []
+for comp in components:
+name = comp.get("name", "(unnamed)")
+centre = comp.get("centre", {})
+orientation = comp.get("orientation", {})
+running in
+9 APPENDIX
+77
+results.append({
+"name": name,
+"top_z": float(comp.get("max_z", 0.0)),
+"bottom_z": float(comp.get("min_z", 0.0)),
+"mid_x": float(centre.get("x", 0.0)),
+"mid_y": float(centre.get("y", 0.0)),
+"yaw_deg": float(orientation.get("yaw_deg", 0.0)),
+"pitch_deg": float(orientation.get("pitch_deg", 0.0)),
+"roll_deg": float(orientation.get("roll_deg", 0.0)),
+})
+print(f"Loaded {len(results)} embedded component(s).")
+return results, print_model
+def extract_layer_height_from_gcode(gcode_path: Path):
+"""Extract layer height from G-code file."""
+z_values = []
+with open(gcode_path, "r") as f:
+for line in f:
+line = line.strip()
+if line.lower().startswith(";layer height:"):
+return float(line.split(":")[1].strip())
+if line.startswith(";Z:"):
+try:
+z_values.append(float(line.split(":")[1]))
+except ValueError:
+pass
+if len(z_values) >= 2:
+return round(z_values[1]- z_values[0], 5)
+raise ValueError("Could not determine layer height.")
+def connect_printer(port, baud):
+"""Establish serial connection to printer."""
+try:
+ser = serial.Serial(port, baud, timeout=2, write_timeout=2)
+except serial.SerialException as e:
+print(f"Failed to open serial: {e}")
+return None
+time.sleep(2)
+ser.reset_input_buffer()
+ser.reset_output_buffer()
+return ser
+def _send_line(ser, line: str):
+"""Send input line to serial device."""
+ser.write((line.strip() + "\n").encode("ascii"))
+ser.flush()
+def send_gcode(ser, line: str):
+"""Send G-code command and wait for acknowledgement."""
+stripped = line.split(";", 1)[0].strip()
+if not stripped:
+return
+cmd = stripped.split()[0].upper()
+_send_line(ser, stripped)
+if cmd == "G28":
+send_gcode(ser, "M400")
+return
+9 APPENDIX
+78
+if cmd in {"M109", "M190"}:
+timeout = 300
+else:
+timeout = 5
+start = time.time()
+last_activity = start
+while True:
+if time.time()- last_activity > timeout:
+raise TimeoutError(f"No OK for: {line}")
+resp = ser.readline().decode(errors="ignore").strip()
+if not resp:
+continue
+last_activity = time.time()
+if resp.lower().startswith("ok"):
+return
+if resp.lower().startswith("error"):
+raise RuntimeError(resp)
+def send_and_read(ser, line: str, timeout=5):
+"""Send command and return all responses until OK."""
+stripped = line.split(";", 1)[0].strip()
+if not stripped:
+return []
+_send_line(ser, stripped)
+responses = []
+start = time.time()
+last_activity = start
+while True:
+if time.time()- last_activity > timeout:
+raise TimeoutError(f"No OK for: {line}")
+resp = ser.readline().decode(errors="ignore").strip()
+if not resp:
+continue
+last_activity = time.time()
+if resp.lower().startswith("ok"):
+return responses
+if resp.lower().startswith("error"):
+raise RuntimeError(resp)
+responses.append(resp)
+def send_command(ser, command):
+"""Send command without response handling."""
+cmd = command + "\n"
+print(f">>> Sending: {command}")
+ser.write(cmd.encode("utf-8"))
+time.sleep(0.2)
+while ser.in_waiting:
+response = ser.readline().decode("utf-8").strip()
+print(f"<<< {response}")
+def initialise_printer(ser):
+"""Initialise printer settings and communication."""
+info = send_and_read(ser, "M115")
+for line in info:
+9 APPENDIX
+79
+print("FW:", line)
+send_gcode(ser, "G90")
+send_gcode(ser, "G21")
+def perform_embedding_sequence(ser, component, outer_wall_moves, prev_layer_z,
+current_layer_z):
+"""Execute embedding sequence including pause, reheating, and purge."""
+SAFE_LIFT = 15
+HOLD_TEMP = 180
+REHEAT_TEMP = 190
+PRINT_TEMP = 205
+HOVER_OFFSET = 0.3
+send_gcode(ser, "M400")
+send_gcode(ser, "M106 S0")
+send_gcode(ser, f"M104 S{HOLD_TEMP}")
+send_gcode(ser, "G91")
+send_gcode(ser, f"G1 Z{SAFE_LIFT} F3000")
+send_gcode(ser, "G90")
+if MANUAL_EMBED:
+print("\n=== EMBEDDING PAUSE ===")
+print(f"Insert component: {component[’name’]}")
+print(f"Target position (CAD): X={component[’mid_x’]:.2f}, Y={
+component[’mid_y’]:.2f}")
+input("Press ENTER to continue...")
+send_gcode(ser, "M400")
+else:
+send_gcode(ser, "G4 P10000")
+#Reheat embedding layer
+if outer_wall_moves and prev_layer_z is not None:
+send_gcode(ser, f"M109 S{REHEAT_TEMP}")
+send_gcode(ser, "M83")
+hover_z = prev_layer_z + HOVER_OFFSET
+send_gcode(ser, f"G1 Z{hover_z:.3f} F1500")
+send_gcode(ser, "G1 F900")
+for move in outer_wall_moves:
+send_gcode(ser, move)
+send_gcode(ser, "G91")
+send_gcode(ser, f"G1 Z{SAFE_LIFT} F2000")
+send_gcode(ser, "G90")
+send_gcode(ser, f"M109 S{PRINT_TEMP}")
+send_gcode(ser, "M400")
+send_gcode(ser, "G90")
+send_gcode(ser, "M83")
+send_gcode(ser, f"G1 Z{current_layer_z:.3f} F1500")
+send_gcode(ser, "M83")
+send_gcode(ser, "M400")
+def extract_layer(component, layer_height):
+"""Compute embedding layer index for a component."""
+return max(0, floor(component["top_z"] / layer_height)- 1)
+def stream_print(gcode_path, components, ser):
+"""Stream G-code and trigger embedding at specified layers."""
+layer_height = extract_layer_height_from_gcode(gcode_path)
+print(f"Layer height: {layer_height}")
+9 APPENDIX
+80
+embed_layers = {}
+if components:
+for comp in components:
+embed_layers.setdefault(
+extract_layer(comp, layer_height), []
+).append(comp)
+current_layer =-1
+outer_wall_moves = []
+last_outer_wall_moves = []
+in_outer_wall = False
+current_layer_z = None
+last_layer_z = None
+captured_z = False
+embedding_pending = False
+with open(gcode_path, "r") as f:
+for line in f:
+stripped = line.strip()
+if stripped.startswith("; LAYER:"):
+last_outer_wall_moves = outer_wall_moves.copy()
+current_layer = int(stripped.split(":")[1])
+outer_wall_moves = []
+in_outer_wall = False
+captured_z = False
+embedding_pending = current_layer in embed_layers
+if (not captured_z
+and stripped.startswith(("G0", "G1"))
+and "Z" in stripped):
+last_layer_z = current_layer_z
+for part in stripped.split():
+if part.startswith("Z"):
+current_layer_z = float(part[1:])
+break
+captured_z = True
+if embedding_pending:
+send_gcode(ser, line)
+for comp in embed_layers[current_layer]:
+perform_embedding_sequence(
+ser,
+comp,
+last_outer_wall_moves,
+last_layer_z,
+current_layer_z)
+del embed_layers[current_layer]
+embedding_pending = False
+continue
+if stripped.startswith(";TYPE:Outer wall"):
+in_outer_wall = True
+continue
+if stripped.startswith(";TYPE:") and not stripped.startswith(";
+TYPE:Outer wall"):
+in_outer_wall = False
+if in_outer_wall and stripped.startswith("G1") and "X" in stripped
+and "Y" in stripped:
+clean = stripped.split("E")[0].split("F")[0].strip()
+outer_wall_moves.append(clean)
+send_gcode(ser, line)
+9 APPENDIX
+81
+def main():
+"""Run full printing and embedding pipeline."""
+components, print_model = load_components_geometry(EMBED_JSON)
+ser = connect_printer(SERIAL_PORT, BAUDRATE)
+if not ser:
+return
+try:
+initialise_printer(ser)
+stream_print(INPUT_GCODE, components, ser)
+except Exception as e:
+print("ERROR:", e)
+try:
+send_gcode(ser, "M0")
+except Exception:
+pass
+finally:
+ser.close()
+if __name__ == "__main__":
+main()
